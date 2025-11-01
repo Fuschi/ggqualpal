@@ -4,27 +4,41 @@
 \alias{pal_qualpal}
 \title{Qualitative palettes via qualpalr (helper)}
 \usage{
-pal_qualpal(direction = 1L, n_max = NULL, ...)
+pal_qualpal(
+  colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+  cvd = c(protan = 0, deutan = 0, tritan = 0),
+  bg = NULL,
+  metric = c("ciede2000", "din99d", "cie76"),
+  extend = NULL,
+  direction = 1L
+)
 }
 \arguments{
-\item{direction}{Integer \code{1} (default) to keep the original order or \code{-1} to
-reverse the generated palette.}
+\item{colorspace}{See \link[qualpalr]{qualpal} (\emph{HSL/LCHab list},
+\emph{"Source:Palette"} string, or \emph{RGB} matrix/data frame).}
 
-\item{n_max}{Optional integer. If not \code{NULL}, it caps the requested \code{n} to
-\code{min(n, n_max)}. This can be helpful to keep colour assignments stable across
-plots with varying numbers of levels.}
+\item{cvd}{Named numeric vector for color vision deficiency adaptation
+(\code{protan}, \code{deutan}, \code{tritan}); passed through to
+\link[qualpalr]{qualpal}.}
 
-\item{...}{Additional arguments forwarded to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
+\item{bg}{Background color (or \code{NULL}); passed through.}
+
+\item{metric}{One of \code{"ciede2000"}, \code{"din99d"}, \code{"cie76"}; passed through.}
+
+\item{extend}{Hex colors or RGB matrix/data frame (or \code{NULL}); passed through.}
+
+\item{direction}{\code{1} to keep order, \code{-1} to reverse. Any other value defaults to \code{1}.}
 }
 \value{
-A function \code{f(n)} returning a character vector of length \code{n}
-with HEX colours.
+A discrete palette object; \code{$fun(n)} returns \code{n} hex colors.
 }
 \description{
-Internal helper that returns a palette function for \code{ggplot2::discrete_scale()}.
-The returned function takes a single integer \code{n} (the number of required
-discrete colours) and calls \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}} to generate a qualitative
-palette of \code{n} colours. Any extra arguments in \code{...} are forwarded to
-\code{qualpalr::qualpal()}, e.g. \code{colorspace}, \code{cvd}, \code{bg}, \code{metric}, \code{extend}, etc.
+Thin wrapper around \link[qualpalr]{qualpal} that returns a discrete palette
+for ggplot-like scales. All argument validation is delegated to
+\code{qualpalr::qualpal()} itself; errors are caught and rethrown with
+a concise message.
+}
+\seealso{
+\link[qualpalr]{qualpal}, \link[qualpalr:list_palettes]{list_palettes}
 }
 \keyword{internal}
