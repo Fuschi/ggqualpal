@@ -5,106 +5,83 @@
 \alias{scale_color_qualpal}
 \alias{scale_colour_qualpal}
 \alias{scale_fill_qualpal}
-\title{Discrete colour/fill scales using qualpalr}
+\title{Discrete colour scales based on qualpal}
 \usage{
 scale_color_qualpal(
   name = ggplot2::waiver(),
-  aesthetics = "color",
   ...,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL,
-  direction = 1L
+  extend = NULL
 )
 
 scale_colour_qualpal(
   name = ggplot2::waiver(),
-  aesthetics = "color",
   ...,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL,
-  direction = 1L
+  extend = NULL
 )
 
 scale_fill_qualpal(
   name = ggplot2::waiver(),
-  aesthetics = "fill",
   ...,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL,
-  direction = 1L
+  extend = NULL
 )
 }
 \arguments{
-\item{name}{Scale name for the legend/guide, or \code{\link[ggplot2:waiver]{ggplot2::waiver()}} for default.}
+\item{name}{The name of the scale. Used as the axis or legend title. If
+\code{waiver()}, the default ggplot2 label is used.}
 
-\item{aesthetics}{Aesthetics this scale works with (e.g. \code{"color"} or \code{"fill"}).}
+\item{...}{Additional arguments passed to \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}.}
 
-\item{...}{Other arguments passed on to \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
-(e.g., \code{breaks}, \code{labels}, \code{limits}, \code{drop}, \code{na.translate}, \code{guide}, \code{position}).}
+\item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
-\item{colorspace}{See \link[qualpalr]{qualpal} (\emph{HSL/LCHab list},
-\emph{"Source:Palette"} string, or \emph{RGB} matrix/data frame).}
+\item{cvd}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
-\item{cvd}{Named numeric vector for color vision deficiency adaptation
-(\code{protan}, \code{deutan}, \code{tritan}); passed through to
-\link[qualpalr]{qualpal}.}
+\item{bg}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
-\item{bg}{Background color (or \code{NULL}); passed through.}
+\item{metric}{Distance metric used by \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}. One of
+\code{"ciede2000"}, \code{"din99d"}, or \code{"cie76"}.}
 
-\item{metric}{One of \code{"ciede2000"}, \code{"din99d"}, \code{"cie76"}; passed through.}
-
-\item{extend}{Hex colors or RGB matrix/data frame (or \code{NULL}); passed through.}
-
-\item{direction}{\code{1} to keep order, \code{-1} to reverse. Any other value defaults to \code{1}.}
+\item{extend}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}} as an initial fixed palette.}
 }
 \value{
-A \code{ggplot2} discrete scale object.
+A ggplot2 discrete scale.
 }
 \description{
-Discrete colour and fill scales for \strong{ggplot2} based on
-\code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}, which algorithmically generates sets of maximally
-distinct qualitative colours. This makes them particularly suitable for
-categorical (qualitative) variables.
+Discrete ggplot2 scales that generate qualitative colours using
+\code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.
 
-You can pass any argument accepted by \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}},
-such as:
-\itemize{
-\item \code{colorspace}: defines the hue–saturation–lightness (HSL) or LCHab space,
-or selects a named palette (e.g. \code{"ColorBrewer:Set2"}).
-\item \code{cvd}: colour vision deficiency adaptation levels.
-\item \code{bg}: background colour to avoid when generating colours.
-\item \code{metric}: distance metric used for colour distinctness.
-\item \code{extend}: optional starting palette to extend.
-}
-}
-\details{
-These functions provide qualitative alternatives to ggplot2’s built-in
-discrete scales (e.g., \code{scale_color_discrete()}), but leverage the
-\code{\link[qualpalr:qualpal]{qualpalr::qualpal()}} algorithm to generate perceptually distinct colours,
-even when dealing with a large number of categories.
+These scales are wrappers around \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}} using
+\code{\link[=pal_qualpal]{pal_qualpal()}} as palette generator.
 }
 \examples{
 library(ggplot2)
-df <- data.frame(x = 1:26, y = 1:26, g = factor(letters[1:26]))
 
-ggplot(df, aes(x, y, color = g)) +
-  geom_point(size = 4) +
-  scale_color_qualpal() +
-  theme_bw()
+df <- data.frame(
+  x = 1:6,
+  y = 1:6,
+  g = factor(c("A", "B", "C", "A", "B", "C"))
+)
+
+ggplot(df, aes(x, y, colour = g)) +
+  geom_point(size = 3) +
+  scale_color_qualpal()
+
+ggplot(df, aes(x, y, fill = g)) +
+  geom_point(shape = 21, size = 4) +
+  scale_fill_qualpal()
 
 }
 \seealso{
-\code{\link[qualpalr:qualpal]{qualpalr::qualpal()}},
-\code{\link[qualpalr:list_palettes]{qualpalr::list_palettes()}},
-\code{\link[ggplot2:scale_colour_discrete]{ggplot2::scale_color_discrete()}},
-\code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
+\code{\link[=pal_qualpal]{pal_qualpal()}}, \code{\link[=map_qualpal]{map_qualpal()}}, \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
 }

@@ -1,63 +1,241 @@
-#' Qualitative palettes via qualpalr (helper)
+# =============================================================================
+# Internal helpers
+# =============================================================================
+
+
+#' Resolve the final level set for a discrete vector
 #'
-#' Thin wrapper around \link[qualpalr]{qualpal} that returns a discrete palette
-#' for ggplot-like scales. All argument validation is delegated to
-#' \code{qualpalr::qualpal()} itself; errors are caught and rethrown with
-#' a concise message.
+#' @description
+#' Internal helper used to determine the final set of categories that will be
+#' assigned colours.
 #'
-#' @param colorspace See \link[qualpalr]{qualpal} (\emph{HSL/LCHab list},
-#'   \emph{"Source:Palette"} string, or \emph{RGB} matrix/data frame).
-#' @param cvd Named numeric vector for color vision deficiency adaptation
-#'   (\code{protan}, \code{deutan}, \code{tritan}); passed through to
-#'   \link[qualpalr]{qualpal}.
-#' @param bg Background color (or \code{NULL}); passed through.
-#' @param metric One of \code{"ciede2000"}, \code{"din99d"}, \code{"cie76"}; passed through.
-#' @param extend Hex colors or RGB matrix/data frame (or \code{NULL}); passed through.
-#' @param direction \code{1} to keep order, \code{-1} to reverse. Any other value defaults to \code{1}.
+#' The function follows this logic:
 #'
-#' @return A discrete palette object; \code{$fun(n)} returns \code{n} hex colors.
+#' - if `levels` is explicitly supplied, it is treated as the authoritative set
+#'   of levels and returned after validation;
+#' - otherwise, if `x` is a factor, its factor levels are used;
+#' - if `drop = TRUE` and `x` is a factor, unused factor levels are removed;
+#' - otherwise, the unique observed non-missing values of `x` are used, in their
+#'   order of appearance.
 #'
-#' @seealso \link[qualpalr]{qualpal}, \link[qualpalr:list_palettes]{list_palettes}
+#' When `levels` is provided, all non-missing categories observed in `x` must be
+#' included in `levels`. This is important because the package relies on a
+#' stable and explicit mapping between category names and colours.
+#'
+#' @param x A vector treated as discrete. It can be a character vector, factor,
+#'   or any other vector that can be converted to character labels.
+#' @param levels Optional character vector specifying the complete set and order
+#'   of levels to be used in the palette.
+#' @param drop Logical; only relevant when `levels = NULL` and `x` is a factor.
+#'   If `TRUE`, unused factor levels are dropped. If `FALSE`, all factor levels
+#'   are kept.
+#'
+#' @return
+#' A character vector containing the resolved level set that will be used to
+#' build the palette.
+#'
+#' @details
+#' This helper is central to the package design because colour generation should
+#' depend on a well-defined set of categories. In particular:
+#'
+#' - using explicit `levels` allows stable colour assignments across different
+#'   plots or objects;
+#' - preserving factor levels can be useful when users want consistent colours
+#'   even for categories not currently observed in a subset of the data;
+#' - using observed values directly is the most convenient behaviour for quick,
+#'   data-driven palette construction.
+#'
 #' @keywords internal
-pal_qualpal <- function(
-    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-    cvd = c(protan = 0, deutan = 0, tritan = 0),
-    bg = NULL,
-    metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL,
-    direction = 1L) {
+.resolve_levels <- function(x, levels = NULL, drop = FALSE) {
+  obs <- unique(as.character(x[!is.na(x)]))
   
-  # --- Package availability
-  if (!requireNamespace("qualpalr", quietly = TRUE)) {
+  if (!is.null(levels)) {
+    lv <- as.character(levels)
+    
+    missing_in_levels <- setdiff(obs, lv)
+    if (length(missing_in_levels) > 0L) {
+      cli::cli_abort(c(
+        "{.arg levels} must include all categories present in {.arg x}.",
+        "x" = "Missing in {.arg levels}: {missing_in_levels}"
+      ))
+    }
+    
+    return(lv)
+  }
+  
+  if (is.factor(x)) {
+    lv <- base::levels(x)
+    
+    if (isTRUE(drop)) {
+      lv <- lv[lv %in% obs]
+    }
+    
+    return(lv)
+  }
+  
+  obs
+}
+
+
+#' Validate named colour assignments
+#'
+#' @description
+#' Internal helper used to validate named colour vectors such as `fixed` and
+#' `override`.
+#'
+#' The function checks that the input:
+#'
+#' - is `NULL`, a named vector, or a named list;
+#' - has non-empty names;
+#' - only refers to categories present in the resolved level set;
+#' - contains valid colour values according to [grDevices::col2rgb()].
+#'
+#' @param x A named vector or named list of colours, or `NULL`.
+#' @param lv Character vector containing the resolved level set.
+#' @param arg Name of the argument being validated. Used in error messages.
+#'
+#' @return
+#' `NULL` if `x` is `NULL`; otherwise a named character vector containing the
+#' validated colours, restricted to names present in `lv`.
+#'
+#' @keywords internal
+.validate_named_colours <- function(x, lv, arg) {
+  
+  if (is.null(x)) return(NULL)
+  
+  arg <- match.arg(arg, c("fixed", "override"))
+  
+  if (is.list(x)) x <- unlist(x, use.names = TRUE)
+  
+  if (is.null(names(x)) || any(names(x) == "")) {
+    cli::cli_abort("{.arg {arg}} must be a named vector or list.")
+  }
+  
+  not_in_levels <- setdiff(names(x), lv)
+  if (length(not_in_levels) > 0L) {
     cli::cli_abort(c(
-      "Package {.pkg qualpalr} is required but not installed.",
-      "i" = "Install with {.code install.packages('qualpalr')}."
+      "Names in {.arg {arg}} must be a subset of the final level set.",
+      "x" = "Unknown names in {.arg {arg}}: {not_in_levels}"
     ))
   }
   
-  # --- Normalize 'metric'
-  metric <- match.arg(metric)
+  ok <- tryCatch(
+    grDevices::col2rgb(x),
+    error = function(e) NULL
+  )
   
-  # --- direction
-  if (!is.numeric(direction) || length(direction) != 1 || !(direction %in% c(1, -1))) {
-    cli::cli_abort("{.arg direction} must be either 1 or -1.")
+  if (is.null(ok)) {
+    cli::cli_abort("{.arg {arg}} contains invalid colours.")
   }
   
-  # --- function
-  fun <- function(n) {
-    if (!is.numeric(n) || length(n) != 1 || is.na(n) || n < 1) {
-      cli::cli_abort("You must request at least one color (n >= 1).")
+  x[names(x) %in% lv]
+}
+
+
+#' Build a named palette map
+#'
+#' @description
+#' Internal helper that constructs a named mapping from discrete categories to
+#' colours.
+#'
+#' The palette is built in three stages:
+#'
+#' - the final set of categories is determined from `x` and `levels`;
+#' - categories listed in `fixed` are assigned their specified colours and these
+#'   colours are also used as fixed reference colours when generating the
+#'   remaining palette;
+#' - categories listed in `override` are replaced at the end, without affecting
+#'   how the other colours were generated.
+#'
+#' If `x` contains missing values and `na_color` is not `NULL`, the returned
+#' mapping also includes a named `"NA"` entry.
+#'
+#' @param x A vector treated as discrete.
+#' @param levels Optional character vector specifying the complete set and order
+#'   of categories.
+#' @param drop Logical; only used when `levels = NULL` and `x` is a factor.
+#' @param na_color Colour associated with missing values when present in `x`.
+#'   Use `NULL` to avoid adding a dedicated `"NA"` entry.
+#' @param fixed Named vector or named list of colours to fix for selected
+#'   categories. These colours are included during palette generation so that
+#'   the remaining colours are chosen to be perceptually distinct from them.
+#' @param override Named vector or named list of colours to apply after palette
+#'   generation. These values replace the final colours of the specified
+#'   categories but do not influence the generation of the remaining colours.
+#' @param colorspace Passed to [qualpalr::qualpal()].
+#' @param cvd Passed to [qualpalr::qualpal()].
+#' @param bg Passed to [qualpalr::qualpal()].
+#' @param metric Distance metric passed to [qualpalr::qualpal()]. Must be one of
+#'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
+#'
+#' @return
+#' A named character vector mapping each resolved level to a colour. If relevant,
+#' the vector may also include an `"NA"` entry.
+#'
+#' @details
+#' The palette is constructed as follows.
+#'
+#' First, the final level set is resolved using `.resolve_levels()`.
+#'
+#' Second, colours in `fixed` are assigned to their corresponding categories.
+#' These colours are also passed to [qualpalr::qualpal()] as fixed reference
+#' colours so that newly generated colours are chosen to maximise perceptual
+#' distance from them.
+#'
+#' Third, colours for the remaining categories are generated automatically.
+#'
+#' Finally, if `override` is supplied, those colours replace the corresponding
+#' entries in the final palette map. This allows users to apply manual
+#' substitutions without affecting the optimisation step used to generate the
+#' other colours.
+#'
+#' The order of the returned palette always follows the resolved level order.
+#'
+#' @keywords internal
+.compute_palette_map <- function(
+    x,
+    levels = NULL,
+    drop = FALSE,
+    na_color = "#BEBEBE",
+    fixed = NULL,
+    override = NULL,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76")
+) {
+  metric <- match.arg(metric)
+  
+  lv <- .resolve_levels(x = x, levels = levels, drop = drop)
+  
+  fixed <- .validate_named_colours(fixed, lv, arg = "fixed")
+  override <- .validate_named_colours(override, lv, arg = "override")
+  
+  lv_fixed <- if (is.null(fixed)) character(0) else intersect(lv, names(fixed))
+  lv_free <- setdiff(lv, lv_fixed)
+  
+  palette_map <- if (length(lv_fixed) > 0L) {
+    stats::setNames(fixed[lv_fixed], lv_fixed)
+  } else {
+    character(0)
+  }
+  
+  if (length(lv_free) > 0L) {
+    seed_colours <- if (length(lv_fixed) > 0L) {
+      unname(fixed[lv_fixed])
+    } else {
+      character(0)
     }
     
-    pal <- tryCatch(
+    pal_all <- tryCatch(
       qualpalr::qualpal(
-        n = as.integer(n),
+        n = length(seed_colours) + length(lv_free),
         colorspace = colorspace,
         cvd = cvd,
         bg = bg,
         metric = metric,
-        extend = extend
-      ),
+        extend = if (length(seed_colours) > 0L) seed_colours else NULL
+      )$hex,
       error = function(e) {
         cli::cli_abort(c(
           "Failed while calling {.fn qualpalr::qualpal}.",
@@ -66,381 +244,464 @@ pal_qualpal <- function(
       }
     )
     
-    if (direction == -1) rev(pal$hex) else pal$hex
+    pal_hex <- pal_all[(length(seed_colours) + 1):length(pal_all)]
+    names(pal_hex) <- lv_free
+    
+    palette_map <- c(palette_map, pal_hex)
+    palette_map <- palette_map[lv]
   }
   
-  scales::new_discrete_palette(fun = fun, type = "colour", nlevels = NA)
+  if (!is.null(override)) {
+    palette_map[names(override)] <- override
+  }
+  
+  if (any(is.na(x)) && !is.null(na_color)) {
+    palette_map <- c(palette_map, `NA` = na_color)
+  }
+  
+  palette_map
 }
 
-#' Discrete colour/fill scales using qualpalr
+
+# =============================================================================
+# Public mapping
+# =============================================================================
+
+#' Map discrete categories to colours using qualpal
 #'
 #' @description
-#' Discrete colour and fill scales for **ggplot2** based on
-#' [qualpalr::qualpal()], which algorithmically generates sets of maximally
-#' distinct qualitative colours. This makes them particularly suitable for
-#' categorical (qualitative) variables.
+#' Generates a colour mapping for a discrete vector using
+#' [qualpalr::qualpal()]. The function returns a named character vector where
+#' each category is associated with a colour.
 #'
-#' You can pass any argument accepted by [qualpalr::qualpal()],
-#' such as:
-#' - `colorspace`: defines the hue–saturation–lightness (HSL) or LCHab space,
-#'   or selects a named palette (e.g. `"ColorBrewer:Set2"`).
-#' - `cvd`: colour vision deficiency adaptation levels.
-#' - `bg`: background colour to avoid when generating colours.
-#' - `metric`: distance metric used for colour distinctness.
-#' - `extend`: optional starting palette to extend.
+#' Colours can be generated automatically, fixed for selected categories using
+#' `fixed`, or replaced after generation using `override`.
+#'
+#' @param x A vector treated as discrete. It may be a character vector, factor,
+#'   or any vector coercible to character labels.
+#' @param levels Optional character vector specifying the complete set and order
+#'   of categories to include in the palette. If provided, it defines both the
+#'   categories that will appear in the palette and their order. All non-missing
+#'   categories present in `x` must be included.
+#' @param drop Logical; only used when `levels = NULL` and `x` is a factor.
+#'   If `TRUE`, unused factor levels are removed. If `FALSE`, all factor levels
+#'   are retained.
+#' @param na_color Colour used for missing values. If `x` contains `NA` and
+#'   `na_color` is not `NULL`, the returned palette includes an additional
+#'   `"NA"` entry. Set to `NULL` to ignore missing values.
+#' @param fixed Named vector or named list specifying colours to fix for
+#'   selected categories. Names must correspond to category labels. These
+#'   colours are included during palette generation so that the remaining
+#'   colours are chosen to be perceptually distinct from them by the 
+#'   optimisation algorithm used in qualpalr::qualpal().
+#' @param override Named vector or named list specifying colours to assign
+#'   after palette generation. Names must correspond to category labels.
+#'   These colours replace the final values of the specified categories but do
+#'   not affect how the other colours are generated.
+#' @param colorspace Passed to [qualpalr::qualpal()]. Defines the region of
+#'   colour space used to generate colours.
+#' @param cvd Passed to [qualpalr::qualpal()]. Can be used to simulate colour
+#'   vision deficiencies.
+#' @param bg Passed to [qualpalr::qualpal()]. Background colour used during
+#'   palette generation.
+#' @param metric Distance metric used by [qualpalr::qualpal()]. One of
+#'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
+#'
+#' @return
+#' A named character vector mapping categories to colours.
 #'
 #' @details
-#' These functions provide qualitative alternatives to ggplot2’s built-in
-#' discrete scales (e.g., `scale_color_discrete()`), but leverage the
-#' [qualpalr::qualpal()] algorithm to generate perceptually distinct colours,
-#' even when dealing with a large number of categories.
+#' The palette is constructed in three steps.
 #'
-#' @param name Scale name for the legend/guide, or [ggplot2::waiver()] for default.
-#' @param aesthetics Aesthetics this scale works with (e.g. `"color"` or `"fill"`).
-#' @param ... Other arguments passed on to [ggplot2::discrete_scale()]
-#'   (e.g., `breaks`, `labels`, `limits`, `drop`, `na.translate`, `guide`, `position`).
-#' @inheritParams pal_qualpal
+#' First, the set of categories is determined:
 #'
-#' @return A `ggplot2` discrete scale object.
+#' - if `levels` is supplied, it defines the complete set and order of categories;
+#' - otherwise, if `x` is a factor, the factor levels are used;
+#' - otherwise, the unique non-missing values of `x` are used.
+#'
+#' Second, colours are assigned:
+#'
+#' - categories specified in `fixed` keep the colours provided by the user;
+#' - colours for the remaining categories are generated automatically using
+#'   [qualpalr::qualpal()], taking the fixed colours into account.
+#'
+#' Finally, if `override` is supplied, those colours replace the corresponding
+#' entries in the final palette.
+#'
+#' The order of the returned palette always follows the resolved category order.
 #'
 #' @seealso
-#' [qualpalr::qualpal()],
-#' [qualpalr::list_palettes()],
-#' [ggplot2::scale_color_discrete()],
-#' [ggplot2::discrete_scale()]
+#' [pal_qualpal()], [qualpalr::qualpal()]
 #'
 #' @examples
-#' library(ggplot2)
-#' df <- data.frame(x = 1:26, y = 1:26, g = factor(letters[1:26]))
+#' x <- c("A", "B", "C", "A")
+#' map_qualpal(x)
 #'
-#' ggplot(df, aes(x, y, color = g)) +
-#'   geom_point(size = 4) +
-#'   scale_color_qualpal() +
-#'   theme_bw()
+#' x <- c("A", "B", "Other", "Smaller")
+#' map_qualpal(
+#'   x,
+#'   fixed = c(
+#'     Other = "transparent",
+#'     Smaller = "#F5F5DC"
+#'   )
+#' )
 #'
-#' @name scale_qualpal
-#' @aliases scale_color_qualpal scale_colour_qualpal scale_fill_qualpal
-NULL
-
+#' x <- c("A", "B", "A", "C")
+#' pal <- map_qualpal(x)
+#' pal[as.character(x)]
+#'
+#' # Final replacement after palette generation
+#' map_qualpal(
+#'   x,
+#'   override = c(A = "#000000")
+#' )
+#'
 #' @export
-#' @rdname scale_qualpal
-scale_color_qualpal <- function(name = ggplot2::waiver(), 
-                                aesthetics = "color",
-                                ...,
-                                colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-                                cvd = c(protan = 0, deutan = 0, tritan = 0),
-                                bg = NULL,
-                                metric = c("ciede2000", "din99d", "cie76"),
-                                extend = NULL,
-                                direction = 1L) {
-  ggplot2::discrete_scale(
-    aesthetics = aesthetics,
-    name = name,
-    palette = pal_qualpal(colorspace = colorspace, cvd = cvd, bg = bg,
-                          metric = metric, extend = extend, direction = direction),
-    ...
-  )
-}
-
-#' @export
-#' @rdname scale_qualpal
-scale_colour_qualpal <- function(name = ggplot2::waiver(), 
-                                aesthetics = "color",
-                                ...,
-                                colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-                                cvd = c(protan = 0, deutan = 0, tritan = 0),
-                                bg = NULL,
-                                metric = c("ciede2000", "din99d", "cie76"),
-                                extend = NULL,
-                                direction = 1L) {
-  ggplot2::discrete_scale(
-    aesthetics = aesthetics,
-    name = name,
-    palette = pal_qualpal(colorspace = colorspace, cvd = cvd, bg = bg,
-                          metric = metric, extend = extend, direction = direction),
-    ...
-  )
-}
-
-#' @export
-#' @rdname scale_qualpal
-scale_fill_qualpal <- function(name = ggplot2::waiver(), 
-                                aesthetics = "fill",
-                                ...,
-                                colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-                                cvd = c(protan = 0, deutan = 0, tritan = 0),
-                                bg = NULL,
-                                metric = c("ciede2000", "din99d", "cie76"),
-                                extend = NULL,
-                                direction = 1L) {
-  ggplot2::discrete_scale(
-    aesthetics = aesthetics,
-    name = name,
-    palette = pal_qualpal(colorspace = colorspace, cvd = cvd, bg = bg,
-                          metric = metric, extend = extend, direction = direction),
-    ...
-  )
-}
-
-
-#' Map a vector of categories to qualpalr colours
-#'
-#' Returns a character vector of hex colours aligned to `x`, using a
-#' qualitative palette generated via [qualpalr::qualpal()].
-#' If `levels` is supplied, it must include **all** non-`NA` categories
-#' found in `x`, otherwise an error is thrown. Fixed colours in `fix`
-#' must also be a subset of `levels`.
-#'
-#' @param x A vector (character, factor, numeric, etc.). Treated as discrete.
-#' @param levels Optional character vector defining the full set **and order**
-#'   of categories. If provided, it must contain all non-`NA` categories in `x`.
-#'   If `NULL`, factor levels (optionally dropped) or unique values are used.
-#' @param drop Logical; only used when `levels = NULL` and `x` is a factor.
-#'   If `TRUE`, drop unused factor levels; if `FALSE` (default), keep them.
-#' @param na_color Colour for `NA` values in `x` (default `"#BEBEBE"`). Use `NULL` to
-#'   leave `NA` unchanged.
-#' @param fix Named hex colours to pre-assign to specific categories
-#'   (e.g. `c(A = "#CD0BBC", C = "#7acf79")`). Must be **hex `#RRGGBB`**
-#'   (case-insensitive). When `levels` is provided, names in `fix` must be a
-#'   subset of `levels`.
-#' @param colorspace,cvd,bg,metric,extend,direction Passed to
-#'   [qualpalr::qualpal()]. See its help for details.
-#'
-#' @return A character vector of hex colours (same length as `x`), with
-#'   `attr(result, "palette")` = named mapping level → colour (includes `"NA"`
-#'   if `na_color` is not `NULL` and `x` contains `NA`).
-#'
-#' @seealso [qualpalr::qualpal()]
-#' @export
-qualpal_colors <- function(
+map_qualpal <- function(
     x,
     levels = NULL,
     drop = FALSE,
     na_color = "#BEBEBE",
-    fix = NULL,
+    fixed = NULL,
+    override = NULL,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76")
+) {
+  if (length(x) == 0L) {
+    return(character(0))
+  }
+  
+  .compute_palette_map(
+    x = x,
+    levels = levels,
+    drop = drop,
+    na_color = na_color,
+    fixed = fixed,
+    override = override,
+    colorspace = colorspace,
+    cvd = cvd,
+    bg = bg,
+    metric = metric
+  )
+}
+
+# =============================================================================
+# Palette generators
+# =============================================================================
+
+#' Qualpal discrete palette generator
+#'
+#' @description
+#' Creates a discrete palette generator based on [qualpalr::qualpal()].
+#'
+#' The returned function takes a single argument `n` and generates `n`
+#' qualitative colours.
+#'
+#' @param colorspace Passed to [qualpalr::qualpal()].
+#' @param cvd Passed to [qualpalr::qualpal()].
+#' @param bg Passed to [qualpalr::qualpal()].
+#' @param metric Distance metric used by [qualpalr::qualpal()]. One of
+#'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
+#' @param extend Passed to [qualpalr::qualpal()].
+#'
+#' @return
+#' A function that generates `n` colours when called.
+#'
+#' @seealso
+#' [map_qualpal()], [qualpalr::qualpal()]
+#'
+#' @examples
+#' pal <- pal_qualpal()
+#' pal(5)
+#'
+#' @export
+pal_qualpal <- function(
     colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
     cvd = c(protan = 0, deutan = 0, tritan = 0),
     bg = NULL,
     metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL,
-    direction = 1L
+    extend = NULL
 ) {
-  if (length(x) == 0L) return(character(0))
-  
-  # Determine observed categories (non-NA) in x
-  obs <- unique(as.character(x[!is.na(x)]))
-  
   metric <- match.arg(metric)
   
-  # Decide the set/order of levels
-  if (!is.null(levels)) {
-    lv <- as.character(levels)
+  function(n) {
+    if (n <= 0) return(character(0))
     
-    # STRICT: levels must cover all observed categories in x
-    missing_in_levels <- setdiff(obs, lv)
-    if (length(missing_in_levels) > 0L) {
-      cli::cli_abort(c(
-        "{.arg levels} must include all categories present in {.arg x}.",
-        "x" = "Missing in {.arg levels}: {missing_in_levels}"
-      ))
-    }
-  } else {
-    if (is.factor(x)) {
-      lv <- levels(x)
-      if (drop) lv <- lv[lv %in% obs]
-    } else {
-      lv <- obs
-    }
-  }
-  
-  # Normalise and validate 'fix'
-  if (!is.null(fix)) {
-    if (is.list(fix)) fix <- unlist(fix, use.names = TRUE)
-    if (is.null(names(fix)) || any(names(fix) == "")) {
-      cli::cli_abort("{.arg fix} must be a named vector/list (names are category labels).")
-    }
-    
-    # If levels provided, enforce subset rule for fix
-    not_in_levels <- setdiff(names(fix), lv)
-    if (length(not_in_levels) > 0L) {
-      cli::cli_abort(c(
-        "Names in {.arg fix} must be a subset of {.arg levels}.",
-        "x" = "Not in levels: {not_in_levels}"
-      ))
-    }
-    
-    # Keep only those present in the final level set (in case levels = NULL)
-    fix <- fix[names(fix) %in% lv]
-    
-    # Optional lightweight colour validity check
-    if (length(fix)) {
-      ok <- TRUE
-      res <- try(utils::capture.output(grDevices::col2rgb(fix)), silent = TRUE)
-      if (inherits(res, "try-error")) ok <- FALSE
-      if (!ok) cli::cli_abort("{.arg fix} contains invalid colours (not interpretable by col2rgb).")
-    }
-  }
-  
-  # Split into fixed vs free levels
-  lv_fixed <- if (is.null(fix)) character(0) else intersect(lv, names(fix))
-  lv_free  <- setdiff(lv, lv_fixed)
-  
-  # Start palette map with fixed colours
-  palette_map <- if (length(lv_fixed)) stats::setNames(fix[lv_fixed], lv_fixed) else character(0)
-  
-  # Generate colours for remaining levels (no unknowns can appear later)
-  if (length(lv_free) > 0L) {
-    gen_cols <- qualpalr::qualpal(
-      n = as.integer(length(lv_free)),
-      colorspace = colorspace,
-      cvd = cvd,
-      bg = bg,
-      metric = metric,
-      extend = extend)$hex
-    names(gen_cols) <- lv_free
-    palette_map <- c(palette_map, gen_cols)[lv]  # honour 'lv' order
-  }
-  
-  # Map x -> colours (no unknowns by construction)
-  key <- as.character(x)
-  out <- palette_map[key]
-  
-  # Handle NA in x
-  is_na <- is.na(x)
-  if (any(is_na)) {
-    out[is_na] <- if (is.null(na_color)) NA_character_ else na_color
-    if (!is.null(na_color)) palette_map <- c(palette_map, `NA` = na_color)
-  }
-  
-  out
-}
-
-
-#' Build a qualitative palette (level -> colour) via qualpalr
-#'
-#' Constructs and returns a named vector `palette_map` using 
-#' [qualpalr::qualpal()], mirroring the behaviour of
-#' [qualpal_colors()] but returning the palette instead of colours aligned
-#' to `x`. If `levels` is supplied, it must include **all** non-`NA`
-#' categories found in `x`, otherwise an error is thrown. Fixed colours in
-#' `fix` must also be a subset of `levels`.
-#'
-#' @param x A vector (character, factor, numeric, etc.). Treated as discrete
-#'   for the purpose of inferring categories if `levels = NULL`.
-#' @param levels Optional character vector defining the full set **and order**
-#'   of categories. If provided, it must contain all non-`NA` categories in `x`.
-#'   If `NULL`, factor levels (optionally dropped) or unique values are used.
-#' @param drop Logical; only used when `levels = NULL` and `x` is a factor.
-#'   If `TRUE`, drop unused factor levels; if `FALSE` (default), keep them.
-#' @param na_color Colour for `NA` values (default `"#BEBEBE"`). If `x`
-#'   contains `NA` and `na_color` is not `NULL`, the palette will include an
-#'   `"NA"` entry with this colour.
-#' @param fix Named hex colours to pre-assign to specific categories
-#'   (e.g. `c(A = "#CD0BBC", C = "#7acf79")`). Colours are validated via
-#'   `grDevices::col2rgb()`. When `levels` is provided, names in `fix` must be
-#'   a subset of `levels`.
-#' @param colorspace,cvd,bg,metric,extend,direction Passed to
-#'   [qualpalr::qualpal()]. See its help for details.
-#'
-#' @return A named character vector of hex colours (level → colour). If `x`
-#'   contains `NA` and `na_color` is not `NULL`, the palette includes an `"NA"`
-#'   entry.
-#'
-#' @seealso [qualpal_colors()], [qualpalr::qualpal()]
-#' @export
-qualpal_palette <- function(
-    x,
-    levels = NULL,
-    drop = FALSE,
-    na_color = "#BEBEBE",
-    fix = NULL,
-    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-    cvd = c(protan = 0, deutan = 0, tritan = 0),
-    bg = NULL,
-    metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL,
-    direction = 1L
-) {
-  if (length(x) == 0L) return(character(0))
-  
-  # observed (non-NA)
-  obs <- unique(as.character(x[!is.na(x)]))
-  
-  # metric
-  metric <- match.arg(matrix)
-  
-  # strict levels
-  if (!is.null(levels)) {
-    lv <- as.character(levels)
-    missing_in_levels <- setdiff(obs, lv)
-    if (length(missing_in_levels) > 0L) {
-      cli::cli_abort(c(
-        "{.arg levels} must include all categories present in {.arg x}.",
-        "x" = "Missing in {.arg levels}: {missing_in_levels}"
-      ))
-    }
-  } else {
-    if (is.factor(x)) {
-      lv <- levels(x)
-      if (drop) lv <- lv[lv %in% obs]
-    } else {
-      lv <- obs
-    }
-  }
-  
-  # validate 'fix' colours and subset rule
-  if (!is.null(fix)) {
-    if (is.list(fix)) fix <- unlist(fix, use.names = TRUE)
-    if (is.null(names(fix)) || any(names(fix) == "")) {
-      cli::cli_abort("{.arg fix} must be a named vector/list (names are category labels).")
-    }
-
-    not_in_levels <- setdiff(names(fix), lv)
-    if (length(not_in_levels) > 0L) {
-      cli::cli_abort(c(
-        "Names in {.arg fix} must be a subset of {.arg levels}.",
-        "x" = "Not in levels: {not_in_levels}"
-      ))
-    }
-    
-    if (length(fix)) {
-      ok <- TRUE
-      res <- try(utils::capture.output(grDevices::col2rgb(fix)), silent = TRUE)
-      if (inherits(res, "try-error")) ok <- FALSE
-      if (!ok) cli::cli_abort("{.arg fix} contains invalid colours (not interpretable by col2rgb).")
-    }
-    
-    fix <- fix[names(fix) %in% lv]
-  }
-  
-  # split fixed vs free
-  lv_fixed <- if (is.null(fix)) character(0) else intersect(lv, names(fix))
-  lv_free  <- setdiff(lv, lv_fixed)
-  
-  # start palette with fixed colours
-  palette_map <- if (length(lv_fixed)) stats::setNames(fix[lv_fixed], lv_fixed) else character(0)
-  
-  # generate hex for remaining levels
-  if (length(lv_free) > 0L) {
-    pal_hex <- qualpalr::qualpal(
-      n = as.integer(length(lv_free)),
+    qualpalr::qualpal(
+      n = n,
       colorspace = colorspace,
       cvd = cvd,
       bg = bg,
       metric = metric,
       extend = extend
     )$hex
-    if (identical(direction, -1L)) pal_hex <- rev(pal_hex)
-    
-    gen_cols <- pal_hex
-    names(gen_cols) <- lv_free
-    palette_map <- c(palette_map, gen_cols)[lv]  # honour 'lv' order
+  }
+}
+
+
+# =============================================================================
+# ggplot2 scales
+# =============================================================================
+
+#' Discrete ggplot2 scale based on qualpal
+#'
+#' @description
+#' Internal helper used to construct ggplot2 discrete scales based on
+#' [pal_qualpal()].
+#'
+#' @param aesthetics Character vector of aesthetics to which the scale applies.
+#' @param name The name of the scale. Used as the axis or legend title. If
+#'   `waiver()`, the default ggplot2 label is used.
+#' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
+#' @param colorspace Passed to [qualpalr::qualpal()].
+#' @param cvd Passed to [qualpalr::qualpal()].
+#' @param bg Passed to [qualpalr::qualpal()].
+#' @param metric Distance metric used by [qualpalr::qualpal()]. One of
+#'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
+#' @param extend Passed to [qualpalr::qualpal()].
+#'
+#' @return
+#' A ggplot2 discrete scale.
+#'
+#' @seealso
+#' [pal_qualpal()], [ggplot2::discrete_scale()]
+#'
+#' @keywords internal
+scale_discrete_qualpal <- function(
+    aesthetics,
+    name = ggplot2::waiver(),
+    ...,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76"),
+    extend = NULL
+) {
+  ggplot2::discrete_scale(
+    aesthetics = aesthetics,
+    name = name,
+    palette = pal_qualpal(
+      colorspace = colorspace,
+      cvd = cvd,
+      bg = bg,
+      metric = metric,
+      extend = extend
+    ),
+    ...
+  )
+}
+
+
+#' Discrete colour scales based on qualpal
+#'
+#' @description
+#' Discrete ggplot2 scales that generate qualitative colours using
+#' [qualpalr::qualpal()].
+#'
+#' These scales are wrappers around [ggplot2::discrete_scale()] using
+#' [pal_qualpal()] as palette generator.
+#'
+#' @param name The name of the scale. Used as the axis or legend title. If
+#'   `waiver()`, the default ggplot2 label is used.
+#' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
+#' @param colorspace Passed to [qualpalr::qualpal()].
+#' @param cvd Passed to [qualpalr::qualpal()].
+#' @param bg Passed to [qualpalr::qualpal()].
+#' @param metric Distance metric used by [qualpalr::qualpal()]. One of
+#'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
+#' @param extend Passed to [qualpalr::qualpal()] as an initial fixed palette.
+#'
+#' @return
+#' A ggplot2 discrete scale.
+#'
+#' @seealso
+#' [pal_qualpal()], [map_qualpal()], [ggplot2::discrete_scale()]
+#'
+#' @examples
+#' library(ggplot2)
+#'
+#' df <- data.frame(
+#'   x = 1:6,
+#'   y = 1:6,
+#'   g = factor(c("A", "B", "C", "A", "B", "C"))
+#' )
+#'
+#' ggplot(df, aes(x, y, colour = g)) +
+#'   geom_point(size = 3) +
+#'   scale_color_qualpal()
+#'
+#' ggplot(df, aes(x, y, fill = g)) +
+#'   geom_point(shape = 21, size = 4) +
+#'   scale_fill_qualpal()
+#'
+#' @name scale_qualpal
+NULL
+
+
+#' @rdname scale_qualpal
+#' @export
+scale_color_qualpal <- function(
+    name = ggplot2::waiver(),
+    ...,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76"),
+    extend = NULL
+) {
+  scale_discrete_qualpal(
+    aesthetics = "colour",
+    name = name,
+    ...,
+    colorspace = colorspace,
+    cvd = cvd,
+    bg = bg,
+    metric = metric,
+    extend = extend
+  )
+}
+
+
+#' @rdname scale_qualpal
+#' @export
+scale_colour_qualpal <- function(
+    name = ggplot2::waiver(),
+    ...,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76"),
+    extend = NULL
+) {
+  scale_discrete_qualpal(
+    aesthetics = "colour",
+    name = name,
+    ...,
+    colorspace = colorspace,
+    cvd = cvd,
+    bg = bg,
+    metric = metric,
+    extend = extend
+  )
+}
+
+
+#' @rdname scale_qualpal
+#' @export
+scale_fill_qualpal <- function(
+    name = ggplot2::waiver(),
+    ...,
+    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
+    cvd = c(protan = 0, deutan = 0, tritan = 0),
+    bg = NULL,
+    metric = c("ciede2000", "din99d", "cie76"),
+    extend = NULL
+) {
+  scale_discrete_qualpal(
+    aesthetics = "fill",
+    name = name,
+    ...,
+    colorspace = colorspace,
+    cvd = cvd,
+    bg = bg,
+    metric = metric,
+    extend = extend
+  )
+}
+
+
+# =============================================================================
+# show colors qualpal
+# =============================================================================
+
+
+#' Display a colour palette
+#'
+#' @description
+#' Displays a palette as a series of coloured rectangles.
+#'
+#' This function can be used with both unnamed colour vectors, such as those
+#' returned by [pal_qualpal()], and named colour vectors, such as those returned
+#' by [map_qualpal()].
+#'
+#' @param x A character vector of colours.
+#' @param labels Optional labels to display for each colour. If `NULL` and `x`
+#'   is named, the names of `x` are used. If `NULL` and `x` is unnamed, no
+#'   labels are shown.
+#' @param border Colour used for rectangle borders.
+#' @param cex Axis label size.
+#' @param ... Additional arguments passed to [graphics::title()].
+#'
+#' @return
+#' Invisibly returns `x`.
+#'
+#' @details
+#' If `x` is a named vector and `labels = NULL`, the names are used as labels.
+#' This is particularly useful for palettes generated with [map_qualpal()].
+#'
+#' @examples
+#' # Unnamed palette
+#' pal <- pal_qualpal()(6)
+#' show_qualpal(pal)
+#'
+#' # Named palette
+#' x <- c("A", "B", "C", "A")
+#' pal <- map_qualpal(x)
+#' show_qualpal(pal)
+#'
+#' @export
+show_qualpal <- function(
+    x,
+    labels = NULL,
+    border = "white",
+    cex = 0.8,
+    ...
+) {
+  if (length(x) == 0L) {
+    return(invisible(x))
   }
   
-  # include NA mapping if needed
-  if (any(is.na(x)) && !is.null(na_color)) {
-    palette_map <- c(palette_map, `NA` = na_color)
+  if (is.null(labels) && !is.null(names(x))) {
+    labels <- names(x)
   }
   
-  palette_map
+  n <- length(x)
+  
+  old_par <- graphics::par(no.readonly = TRUE)
+  on.exit(graphics::par(old_par), add = TRUE)
+  
+  bottom_margin <- if (is.null(labels)) 2 else 6
+  graphics::par(mar = c(bottom_margin, 1, 2, 1))
+  
+  graphics::plot.new()
+  graphics::plot.window(xlim = c(0, n), ylim = c(0, 1), xaxs = "i", yaxs = "i")
+  
+  for (i in seq_len(n)) {
+    graphics::rect(
+      xleft = i - 1,
+      ybottom = 0,
+      xright = i,
+      ytop = 1,
+      col = x[i],
+      border = border
+    )
+  }
+  
+  if (!is.null(labels)) {
+    graphics::axis(
+      side = 1,
+      at = seq_len(n) - 0.5,
+      labels = labels,
+      tick = FALSE,
+      las = 2,
+      cex.axis = cex
+    )
+  }
+  
+  graphics::box()
+  graphics::title(...)
+  
+  invisible(x)
 }
