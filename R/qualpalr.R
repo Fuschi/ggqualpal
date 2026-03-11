@@ -95,23 +95,28 @@
 #' @param arg Name of the argument being validated. Used in error messages.
 #'
 #' @return
-#' `NULL` if `x` is `NULL`; otherwise a named character vector containing the
-#' validated colours, restricted to names present in `lv`.
+#' `NULL` if `x` is `NULL`; otherwise a named vector containing the validated
+#' colours, restricted to names present in `lv`.
 #'
 #' @keywords internal
 .validate_named_colours <- function(x, lv, arg) {
   
-  if (is.null(x)) return(NULL)
+  if (is.null(x)) {
+    return(NULL)
+  }
   
   arg <- match.arg(arg, c("fixed", "override"))
   
-  if (is.list(x)) x <- unlist(x, use.names = TRUE)
+  if (is.list(x)) {
+    x <- unlist(x, use.names = TRUE)
+  }
   
   if (is.null(names(x)) || any(names(x) == "")) {
     cli::cli_abort("{.arg {arg}} must be a named vector or list.")
   }
   
   not_in_levels <- setdiff(names(x), lv)
+  
   if (length(not_in_levels) > 0L) {
     cli::cli_abort(c(
       "Names in {.arg {arg}} must be a subset of the final level set.",
@@ -445,52 +450,106 @@ pal_qualpal <- function(
 # ggplot2 scales
 # =============================================================================
 
+ScaleDiscreteQualpal <- ggplot2::ggproto(
+  "ScaleDiscreteQualpal",
+  ggplot2::ScaleDiscrete,
+  
+  map = function(self, x, limits = self$get_limits()) {
+    x_chr <- as.character(x)
+    
+    if (length(limits) == 0L) {
+      return(rep(self$na.value, length(x_chr)))
+    }
+    
+    palette_map <- map_qualpal(
+      x = limits,
+      levels = limits,
+      drop = FALSE,
+      na_color = self$na.value,
+      fixed = self$fixed,
+      override = self$override,
+      colorspace = self$colorspace,
+      cvd = self$cvd,
+      bg = self$bg,
+      metric = self$metric
+    )
+    
+    out <- palette_map[x_chr]
+    out[is.na(out)] <- self$na.value
+    
+    unname(out)
+  }
+)
+
 #' Discrete ggplot2 scale based on qualpal
 #'
 #' @description
 #' Internal helper used to construct ggplot2 discrete scales based on
-#' [pal_qualpal()].
+#' [map_qualpal()] and [pal_qualpal()].
 #'
 #' @param aesthetics Character vector of aesthetics to which the scale applies.
 #' @param name The name of the scale. Used as the axis or legend title. If
 #'   `waiver()`, the default ggplot2 label is used.
 #' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
+#' @param fixed Named vector or named list specifying colours to fix for
+#'   selected categories. Names must correspond to category labels. These
+#'   colours are included during palette generation so that the remaining
+#'   colours are chosen to be perceptually distinct from them by the
+#'   optimisation algorithm used in [qualpalr::qualpal()].
+#' @param override Named vector or named list specifying colours to assign
+#'   after palette generation. Names must correspond to category labels.
+#'   These colours replace the final values of the specified categories but do
+#'   not affect how the other colours are generated.
 #' @param colorspace Passed to [qualpalr::qualpal()].
 #' @param cvd Passed to [qualpalr::qualpal()].
 #' @param bg Passed to [qualpalr::qualpal()].
 #' @param metric Distance metric used by [qualpalr::qualpal()]. One of
 #'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
-#' @param extend Passed to [qualpalr::qualpal()].
+#' @param na.value Colour used for missing values.
 #'
 #' @return
 #' A ggplot2 discrete scale.
 #'
 #' @seealso
-#' [pal_qualpal()], [ggplot2::discrete_scale()]
+#' [map_qualpal()], [pal_qualpal()], [ggplot2::discrete_scale()]
 #'
 #' @keywords internal
 scale_discrete_qualpal <- function(
     aesthetics,
     name = ggplot2::waiver(),
     ...,
+    fixed = NULL,
+    override = NULL,
     colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
     cvd = c(protan = 0, deutan = 0, tritan = 0),
     bg = NULL,
     metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL
+    na.value = NA
 ) {
-  ggplot2::discrete_scale(
+  metric <- match.arg(metric)
+  
+  scale <- ggplot2::discrete_scale(
     aesthetics = aesthetics,
     name = name,
     palette = pal_qualpal(
       colorspace = colorspace,
       cvd = cvd,
       bg = bg,
-      metric = metric,
-      extend = extend
+      metric = metric
     ),
-    ...
+    ...,
+    na.value = na.value,
+    super = ScaleDiscreteQualpal
   )
+  
+  scale$fixed <- if (is.null(fixed)) NULL else as.list(fixed)
+  scale$override <- if (is.null(override)) NULL else as.list(override)
+  scale$colorspace <- colorspace
+  scale$cvd <- cvd
+  scale$bg <- bg
+  scale$metric <- metric
+  
+  scale
 }
 
 
@@ -500,24 +559,34 @@ scale_discrete_qualpal <- function(
 #' Discrete ggplot2 scales that generate qualitative colours using
 #' [qualpalr::qualpal()].
 #'
-#' These scales are wrappers around [ggplot2::discrete_scale()] using
-#' [pal_qualpal()] as palette generator.
+#' These scales are wrappers around [ggplot2::discrete_scale()] and support
+#' both fixed colours used during palette generation and final colour
+#' replacements.
 #'
 #' @param name The name of the scale. Used as the axis or legend title. If
 #'   `waiver()`, the default ggplot2 label is used.
 #' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
+#' @param fixed Named vector or named list specifying colours to fix for
+#'   selected categories. Names must correspond to category labels. These
+#'   colours are included during palette generation so that the remaining
+#'   colours are chosen to be perceptually distinct from them by the
+#'   optimisation algorithm used in [qualpalr::qualpal()].
+#' @param override Named vector or named list specifying colours to assign
+#'   after palette generation. Names must correspond to category labels.
+#'   These colours replace the final values of the specified categories but do
+#'   not affect how the other colours are generated.
 #' @param colorspace Passed to [qualpalr::qualpal()].
 #' @param cvd Passed to [qualpalr::qualpal()].
 #' @param bg Passed to [qualpalr::qualpal()].
 #' @param metric Distance metric used by [qualpalr::qualpal()]. One of
 #'   `"ciede2000"`, `"din99d"`, or `"cie76"`.
-#' @param extend Passed to [qualpalr::qualpal()] as an initial fixed palette.
+#' @param na.value Colour used for missing values.
 #'
 #' @return
 #' A ggplot2 discrete scale.
 #'
 #' @seealso
-#' [pal_qualpal()], [map_qualpal()], [ggplot2::discrete_scale()]
+#' [map_qualpal()], [pal_qualpal()], [ggplot2::discrete_scale()]
 #'
 #' @examples
 #' library(ggplot2)
@@ -536,6 +605,27 @@ scale_discrete_qualpal <- function(
 #'   geom_point(shape = 21, size = 4) +
 #'   scale_fill_qualpal()
 #'
+#' df2 <- data.frame(
+#'   x = 1:5,
+#'   y = 1:5,
+#'   g = factor(c("A", "Other", "B", "Smaller", "A"))
+#' )
+#'
+#' ggplot(df2, aes(x, y, fill = g)) +
+#'   geom_point(shape = 21, size = 5) +
+#'   scale_fill_qualpal(
+#'     fixed = c(
+#'       Other = "transparent",
+#'       Smaller = "#F5F5DC"
+#'     )
+#'   )
+#'
+#' ggplot(df2, aes(x, y, colour = g)) +
+#'   geom_point(size = 4) +
+#'   scale_color_qualpal(
+#'     override = c(Other = "#000000")
+#'   )
+#'
 #' @name scale_qualpal
 NULL
 
@@ -545,47 +635,32 @@ NULL
 scale_color_qualpal <- function(
     name = ggplot2::waiver(),
     ...,
+    fixed = NULL,
+    override = NULL,
     colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
     cvd = c(protan = 0, deutan = 0, tritan = 0),
     bg = NULL,
     metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL
+    na.value = NA
 ) {
   scale_discrete_qualpal(
     aesthetics = "colour",
     name = name,
     ...,
+    fixed = fixed,
+    override = override,
     colorspace = colorspace,
     cvd = cvd,
     bg = bg,
     metric = metric,
-    extend = extend
+    na.value = na.value
   )
 }
 
 
 #' @rdname scale_qualpal
 #' @export
-scale_colour_qualpal <- function(
-    name = ggplot2::waiver(),
-    ...,
-    colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
-    cvd = c(protan = 0, deutan = 0, tritan = 0),
-    bg = NULL,
-    metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL
-) {
-  scale_discrete_qualpal(
-    aesthetics = "colour",
-    name = name,
-    ...,
-    colorspace = colorspace,
-    cvd = cvd,
-    bg = bg,
-    metric = metric,
-    extend = extend
-  )
-}
+scale_colour_qualpal <- scale_color_qualpal
 
 
 #' @rdname scale_qualpal
@@ -593,21 +668,25 @@ scale_colour_qualpal <- function(
 scale_fill_qualpal <- function(
     name = ggplot2::waiver(),
     ...,
+    fixed = NULL,
+    override = NULL,
     colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
     cvd = c(protan = 0, deutan = 0, tritan = 0),
     bg = NULL,
     metric = c("ciede2000", "din99d", "cie76"),
-    extend = NULL
+    na.value = NA
 ) {
   scale_discrete_qualpal(
     aesthetics = "fill",
     name = name,
     ...,
+    fixed = fixed,
+    override = override,
     colorspace = colorspace,
     cvd = cvd,
     bg = bg,
     metric = metric,
-    extend = extend
+    na.value = na.value
   )
 }
 

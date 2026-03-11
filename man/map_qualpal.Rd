@@ -37,7 +37,8 @@ are retained.}
 \item{fixed}{Named vector or named list specifying colours to fix for
 selected categories. Names must correspond to category labels. These
 colours are included during palette generation so that the remaining
-colours are chosen to be perceptually distinct from them by the optimisation algorithm used in qualpalr::qualpal().}
+colours are chosen to be perceptually distinct from them by the
+optimisation algorithm used in qualpalr::qualpal().}
 
 \item{override}{Named vector or named list specifying colours to assign
 after palette generation. Names must correspond to category labels.
