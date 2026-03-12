@@ -22,9 +22,8 @@ map_qualpal(
 or any vector coercible to character labels.}
 
 \item{levels}{Optional character vector specifying the complete set and order
-of categories to include in the palette. If provided, it defines both the
-categories that will appear in the palette and their order. All non-missing
-categories present in \code{x} must be included.}
+of categories to include in the palette. All non-missing categories
+present in \code{x} must be included.}
 
 \item{drop}{Logical; only used when \code{levels = NULL} and \code{x} is a factor.
 If \code{TRUE}, unused factor levels are removed. If \code{FALSE}, all factor levels
@@ -36,14 +35,11 @@ are retained.}
 
 \item{fixed}{Named vector or named list specifying colours to fix for
 selected categories. Names must correspond to category labels. These
-colours are included during palette generation so that the remaining
-colours are chosen to be perceptually distinct from them by the
-optimisation algorithm used in qualpalr::qualpal().}
+colours are used during palette generation.}
 
 \item{override}{Named vector or named list specifying colours to assign
 after palette generation. Names must correspond to category labels.
-These colours replace the final values of the specified categories but do
-not affect how the other colours are generated.}
+These colours replace the final values of the specified categories.}
 
 \item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}. Defines the region of
 colour space used to generate colours.}
@@ -65,20 +61,18 @@ Generates a colour mapping for a discrete vector using
 \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}. The function returns a named character vector where
 each category is associated with a colour.
 
-Colours can be generated automatically, fixed for selected categories using
-\code{fixed}, or replaced after generation using \code{override}.
+Colours can be generated automatically, fixed with \code{fixed}, or replaced with
+\code{override}.
 }
 \details{
-The palette is constructed in three steps.
-
-First, the set of categories is determined:
+Category resolution follows this order:
 \itemize{
 \item if \code{levels} is supplied, it defines the complete set and order of categories;
 \item otherwise, if \code{x} is a factor, the factor levels are used;
 \item otherwise, the unique non-missing values of \code{x} are used.
 }
 
-Second, colours are assigned:
+Colour assignment follows this order:
 \itemize{
 \item categories specified in \code{fixed} keep the colours provided by the user;
 \item colours for the remaining categories are generated automatically using

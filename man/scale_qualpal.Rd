@@ -51,14 +51,11 @@ scale_fill_qualpal(
 
 \item{fixed}{Named vector or named list specifying colours to fix for
 selected categories. Names must correspond to category labels. These
-colours are included during palette generation so that the remaining
-colours are chosen to be perceptually distinct from them by the
-optimisation algorithm used in \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
+colours are used during palette generation.}
 
 \item{override}{Named vector or named list specifying colours to assign
 after palette generation. Names must correspond to category labels.
-These colours replace the final values of the specified categories but do
-not affect how the other colours are generated.}
+These colours replace the final values of the specified categories.}
 
 \item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
@@ -78,9 +75,8 @@ A ggplot2 discrete scale.
 Discrete ggplot2 scales that generate qualitative colours using
 \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.
 
-These scales are wrappers around \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}} and support
-both fixed colours used during palette generation and final colour
-replacements.
+These scales support fixed colours used during palette generation and final
+colour replacements.
 }
 \examples{
 library(ggplot2)

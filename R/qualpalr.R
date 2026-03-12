@@ -663,6 +663,10 @@ scale_fill_qualpal <- function(
 #'   labels are shown.
 #' @param border Colour used for rectangle borders.
 #' @param cex Axis label size.
+#' @param mar Optional numeric vector of length 4 passed to
+#'   [graphics::par()] as the plot margins in the form
+#'   `c(bottom, left, top, right)`. If `NULL`, a default margin is chosen based
+#'   on whether labels are shown.
 #' @param ... Additional arguments passed to [graphics::title()].
 #'
 #' @return
@@ -678,12 +682,16 @@ scale_fill_qualpal <- function(
 #' pal <- map_qualpal(x)
 #' show_qualpal(pal)
 #'
+#' # Increase the bottom margin for long labels
+#' show_qualpal(pal, mar = c(10, 1, 2, 1))
+#'
 #' @export
 show_qualpal <- function(
     x,
     labels = NULL,
     border = "white",
     cex = 0.8,
+    mar = NULL,
     ...
 ) {
   if (length(x) == 0L) {
@@ -699,8 +707,12 @@ show_qualpal <- function(
   old_par <- graphics::par(no.readonly = TRUE)
   on.exit(graphics::par(old_par), add = TRUE)
   
-  bottom_margin <- if (is.null(labels)) 2 else 6
-  graphics::par(mar = c(bottom_margin, 1, 2, 1))
+  if (is.null(mar)) {
+    bottom_margin <- if (is.null(labels)) 2 else 6
+    mar <- c(bottom_margin, 1, 2, 1)
+  }
+  
+  graphics::par(mar = mar)
   
   graphics::plot.new()
   graphics::plot.window(xlim = c(0, n), ylim = c(0, 1), xaxs = "i", yaxs = "i")

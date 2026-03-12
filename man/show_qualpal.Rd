@@ -4,7 +4,7 @@
 \alias{show_qualpal}
 \title{Display a colour palette}
 \usage{
-show_qualpal(x, labels = NULL, border = "white", cex = 0.8, ...)
+show_qualpal(x, labels = NULL, border = "white", cex = 0.8, mar = NULL, ...)
 }
 \arguments{
 \item{x}{A character vector of colours.}
@@ -17,6 +17,11 @@ labels are shown.}
 
 \item{cex}{Axis label size.}
 
+\item{mar}{Optional numeric vector of length 4 passed to
+\code{\link[graphics:par]{graphics::par()}} as the plot margins in the form
+\code{c(bottom, left, top, right)}. If \code{NULL}, a default margin is chosen based
+on whether labels are shown.}
+
 \item{...}{Additional arguments passed to \code{\link[graphics:title]{graphics::title()}}.}
 }
 \value{
@@ -25,13 +30,8 @@ Invisibly returns \code{x}.
 \description{
 Displays a palette as a series of coloured rectangles.
 
-This function can be used with both unnamed colour vectors, such as those
-returned by \code{\link[=pal_qualpal]{pal_qualpal()}}, and named colour vectors, such as those returned
-by \code{\link[=map_qualpal]{map_qualpal()}}.
-}
-\details{
-If \code{x} is a named vector and \code{labels = NULL}, the names are used as labels.
-This is particularly useful for palettes generated with \code{\link[=map_qualpal]{map_qualpal()}}.
+Works with unnamed colour vectors from \code{\link[=pal_qualpal]{pal_qualpal()}} and named colour
+vectors from \code{\link[=map_qualpal]{map_qualpal()}}.
 }
 \examples{
 # Unnamed palette
@@ -42,5 +42,8 @@ show_qualpal(pal)
 x <- c("A", "B", "C", "A")
 pal <- map_qualpal(x)
 show_qualpal(pal)
+
+# Increase the bottom margin for long labels
+show_qualpal(pal, mar = c(10, 1, 2, 1))
 
 }

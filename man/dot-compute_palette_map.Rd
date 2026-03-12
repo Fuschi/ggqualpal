@@ -29,12 +29,11 @@ of categories.}
 Use \code{NULL} to avoid adding a dedicated \code{"NA"} entry.}
 
 \item{fixed}{Named vector or named list of colours to fix for selected
-categories. These colours are included during palette generation so that
-the remaining colours are chosen to be perceptually distinct from them.}
+categories. These colours are used during palette generation.}
 
 \item{override}{Named vector or named list of colours to apply after palette
 generation. These values replace the final colours of the specified
-categories but do not influence the generation of the remaining colours.}
+categories.}
 
 \item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
@@ -50,39 +49,16 @@ A named character vector mapping each resolved level to a colour. If relevant,
 the vector may also include an \code{"NA"} entry.
 }
 \description{
-Internal helper that constructs a named mapping from discrete categories to
-colours.
+Build a named mapping from categories to colours.
 
 The palette is built in three stages:
 \itemize{
 \item the final set of categories is determined from \code{x} and \code{levels};
-\item categories listed in \code{fixed} are assigned their specified colours and these
-colours are also used as fixed reference colours when generating the
-remaining palette;
-\item categories listed in \code{override} are replaced at the end, without affecting
-how the other colours were generated.
+\item colours in \code{fixed} are assigned first and used during palette generation;
+\item colours in \code{override} are replaced at the end.
 }
 
 If \code{x} contains missing values and \code{na_color} is not \code{NULL}, the returned
 mapping also includes a named \code{"NA"} entry.
-}
-\details{
-The palette is constructed as follows.
-
-First, the final level set is resolved using \code{.resolve_levels()}.
-
-Second, colours in \code{fixed} are assigned to their corresponding categories.
-These colours are also passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}} as fixed reference
-colours so that newly generated colours are chosen to maximise perceptual
-distance from them.
-
-Third, colours for the remaining categories are generated automatically.
-
-Finally, if \code{override} is supplied, those colours replace the corresponding
-entries in the final palette map. This allows users to apply manual
-substitutions without affecting the optimisation step used to generate the
-other colours.
-
-The order of the returned palette always follows the resolved level order.
 }
 \keyword{internal}

@@ -18,37 +18,21 @@ If \code{TRUE}, unused factor levels are dropped. If \code{FALSE}, all factor le
 are kept.}
 }
 \value{
-A character vector containing the resolved level set that will be used to
-build the palette.
+A character vector containing the resolved level set.
 }
 \description{
-Internal helper used to determine the final set of categories that will be
-assigned colours.
+Resolve the categories used to build the palette.
 
-The function follows this logic:
+Resolution follows this order:
 \itemize{
-\item if \code{levels} is explicitly supplied, it is treated as the authoritative set
-of levels and returned after validation;
-\item otherwise, if \code{x} is a factor, its factor levels are used;
-\item if \code{drop = TRUE} and \code{x} is a factor, unused factor levels are removed;
-\item otherwise, the unique observed non-missing values of \code{x} are used, in their
-order of appearance.
+\item if \code{levels} is supplied, it is returned after validation;
+\item otherwise, factor levels are used for factors;
+\item if \code{drop = TRUE}, unused factor levels are removed;
+\item otherwise, the unique observed non-missing values of \code{x} are used in order
+of appearance.
 }
 
-When \code{levels} is provided, all non-missing categories observed in \code{x} must be
-included in \code{levels}. This is important because the package relies on a
-stable and explicit mapping between category names and colours.
-}
-\details{
-This helper is central to the package design because colour generation should
-depend on a well-defined set of categories. In particular:
-\itemize{
-\item using explicit \code{levels} allows stable colour assignments across different
-plots or objects;
-\item preserving factor levels can be useful when users want consistent colours
-even for categories not currently observed in a subset of the data;
-\item using observed values directly is the most convenient behaviour for quick,
-data-driven palette construction.
-}
+When \code{levels} is provided, it must include all non-missing categories
+observed in \code{x}.
 }
 \keyword{internal}

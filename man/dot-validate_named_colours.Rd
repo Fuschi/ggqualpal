@@ -18,10 +18,9 @@
 colours, restricted to names present in \code{lv}.
 }
 \description{
-Internal helper used to validate named colour vectors such as \code{fixed} and
-\code{override}.
+Validate named colour vectors such as \code{fixed} and \code{override}.
 
-The function checks that the input:
+Validation checks that the input:
 \itemize{
 \item is \code{NULL}, a named vector, or a named list;
 \item has non-empty names;

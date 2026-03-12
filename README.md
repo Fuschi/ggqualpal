@@ -1,86 +1,85 @@
 # ggqualpal
 
-Generate perceptually distinct qualitative palettes for categorical data and
-use them consistently with **ggplot2**.
+Generate perceptually distinct qualitative palettes for categorical data
+and use them consistently with **ggplot2**.
 
 `ggqualpal` wraps the palette optimisation algorithm implemented in
 [`qualpalr`](https://github.com/jolars/qualpalr) and focuses on a simple
 workflow for:
 
-- mapping categories to colours
-- keeping colours stable across plots
-- applying the same mapping in **ggplot2**
+-   mapping categories to colours
+-   keeping colours stable across plots
+-   applying the same mapping in **ggplot2**
 
 The package is most useful when the same categorical variable appears in
 multiple plots and colour consistency matters.
 
----
+------------------------------------------------------------------------
 
 # Installation
 
 You can install the development version from GitHub:
 
-```r
+``` r
 # install.packages("remotes")
 remotes::install_github("Fuschi/ggqualpal")
 ```
 
----
+------------------------------------------------------------------------
 
 # Example data
 
-`ggqualpal` includes `otu_HMP2`, a genus-level relative abundance table for one
-subject across 51 samples in long format.
+`ggqualpal` includes `otu_HMP2`, a genus-level relative abundance table
+for one subject across 51 samples in long format.
 
-```r
+``` r
+library(tidyverse)
 library(ggqualpal)
-library(ggplot2)
 
 data("otu_HMP2", package = "ggqualpal")
 
 head(otu_HMP2)
 ```
 
----
+------------------------------------------------------------------------
 
 # Map genera to colours
 
-Build one palette for all genera in the dataset and keep `smaller` fixed.
+Build one palette for all genera in the dataset and keep `smaller`
+fixed.
 
-```r
-levels_genus <- c(
-  setdiff(unique(otu_HMP2$genus), "smaller"),
-  "smaller"
-)
+``` r
+otu_HMP2 <- otu_HMP2 %>%
+  mutate(
+    genus = as_factor(genus),
+    genus = fct_relevel(genus, "smaller", after = Inf)
+  )
 
-pal <- map_qualpal(
-  otu_HMP2$genus,
-  levels = levels_genus,
-  fixed = c(smaller = "#E6E6E6")
-)
+pal <- map_qualpal(otu_HMP2$genus, fixed = c(smaller = "#E6E6E6"))
 
 head(pal)
 ```
 
 Preview the mapping:
 
-```r
-show_qualpal(pal)
+``` r
+show_qualpal(pal, mar = c(14, 1, 2, 1))
 ```
 
-![Palette used for the HMP2 example](man/figures/README-pal-otu-HMP2.png)
+![Palette used for the HMP2
+example](man/figures/README-pal-otu-HMP2.png)
 
 Apply the palette back to the data:
 
-```r
+``` r
 pal[otu_HMP2$genus]
 ```
 
----
+------------------------------------------------------------------------
 
 # Use with ggplot2
 
-```r
+``` r
 ggplot(otu_HMP2, aes(sample_id, rela, fill = genus)) +
   geom_col() +
   scale_fill_qualpal(
@@ -94,45 +93,46 @@ ggplot(otu_HMP2, aes(sample_id, rela, fill = genus)) +
   )
 ```
 
-![Genus-level relative abundance across all 51 samples](man/figures/README-otu-HMP2.png)
+![Genus-level relative abundance across all 51
+samples](man/figures/README-otu-HMP2.png)
 
----
+------------------------------------------------------------------------
 
 # Generate qualitative palettes
 
 Use `pal_qualpal()` when you only need a vector of distinct colours.
 
-```r
+``` r
 pal_fun <- pal_qualpal()
 
 pal_fun(6)
 ```
 
-```r
+``` r
 show_qualpal(pal_fun(6))
 ```
 
----
+------------------------------------------------------------------------
 
 # Why ggqualpal?
 
-Compared with using `qualpalr` directly, `ggqualpal` provides a more direct
-workflow for:
+Compared with using `qualpalr` directly, `ggqualpal` provides a more
+direct workflow for:
 
-- stable category-to-colour mapping
-- fixed colours for selected categories
-- direct use in ggplot2 scales
-- quick palette inspection with `show_qualpal()`
+-   stable category-to-colour mapping
+-   fixed colours for selected categories
+-   direct use in ggplot2 scales
+-   quick palette inspection with `show_qualpal()`
 
----
+------------------------------------------------------------------------
 
 # Related packages
 
-- `qualpalr` – perceptually optimised qualitative palettes  
-- `scales` – scale tools for ggplot2  
-- `colorspace` – advanced colour utilities  
+-   `qualpalr` – perceptually optimised qualitative palettes\
+-   `scales` – scale tools for ggplot2\
+-   `colorspace` – advanced colour utilities
 
----
+------------------------------------------------------------------------
 
 # License
 
