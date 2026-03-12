@@ -6,21 +6,18 @@
 #' Resolve the final level set for a discrete vector
 #'
 #' @description
-#' Internal helper used to determine the final set of categories that will be
-#' assigned colours.
+#' Resolve the categories used to build the palette.
 #'
-#' The function follows this logic:
+#' Resolution follows this order:
 #'
-#' - if `levels` is explicitly supplied, it is treated as the authoritative set
-#'   of levels and returned after validation;
-#' - otherwise, if `x` is a factor, its factor levels are used;
-#' - if `drop = TRUE` and `x` is a factor, unused factor levels are removed;
-#' - otherwise, the unique observed non-missing values of `x` are used, in their
-#'   order of appearance.
+#' - if `levels` is supplied, it is returned after validation;
+#' - otherwise, factor levels are used for factors;
+#' - if `drop = TRUE`, unused factor levels are removed;
+#' - otherwise, the unique observed non-missing values of `x` are used in order
+#'   of appearance.
 #'
-#' When `levels` is provided, all non-missing categories observed in `x` must be
-#' included in `levels`. This is important because the package relies on a
-#' stable and explicit mapping between category names and colours.
+#' When `levels` is provided, it must include all non-missing categories
+#' observed in `x`.
 #'
 #' @param x A vector treated as discrete. It can be a character vector, factor,
 #'   or any other vector that can be converted to character labels.
@@ -31,19 +28,7 @@
 #'   are kept.
 #'
 #' @return
-#' A character vector containing the resolved level set that will be used to
-#' build the palette.
-#'
-#' @details
-#' This helper is central to the package design because colour generation should
-#' depend on a well-defined set of categories. In particular:
-#'
-#' - using explicit `levels` allows stable colour assignments across different
-#'   plots or objects;
-#' - preserving factor levels can be useful when users want consistent colours
-#'   even for categories not currently observed in a subset of the data;
-#' - using observed values directly is the most convenient behaviour for quick,
-#'   data-driven palette construction.
+#' A character vector containing the resolved level set.
 #'
 #' @keywords internal
 .resolve_levels <- function(x, levels = NULL, drop = FALSE) {
@@ -80,10 +65,9 @@
 #' Validate named colour assignments
 #'
 #' @description
-#' Internal helper used to validate named colour vectors such as `fixed` and
-#' `override`.
+#' Validate named colour vectors such as `fixed` and `override`.
 #'
-#' The function checks that the input:
+#' Validation checks that the input:
 #'
 #' - is `NULL`, a named vector, or a named list;
 #' - has non-empty names;
@@ -140,17 +124,13 @@
 #' Build a named palette map
 #'
 #' @description
-#' Internal helper that constructs a named mapping from discrete categories to
-#' colours.
+#' Build a named mapping from categories to colours.
 #'
 #' The palette is built in three stages:
 #'
 #' - the final set of categories is determined from `x` and `levels`;
-#' - categories listed in `fixed` are assigned their specified colours and these
-#'   colours are also used as fixed reference colours when generating the
-#'   remaining palette;
-#' - categories listed in `override` are replaced at the end, without affecting
-#'   how the other colours were generated.
+#' - colours in `fixed` are assigned first and used during palette generation;
+#' - colours in `override` are replaced at the end.
 #'
 #' If `x` contains missing values and `na_color` is not `NULL`, the returned
 #' mapping also includes a named `"NA"` entry.
@@ -162,11 +142,10 @@
 #' @param na_color Colour associated with missing values when present in `x`.
 #'   Use `NULL` to avoid adding a dedicated `"NA"` entry.
 #' @param fixed Named vector or named list of colours to fix for selected
-#'   categories. These colours are included during palette generation so that
-#'   the remaining colours are chosen to be perceptually distinct from them.
+#'   categories. These colours are used during palette generation.
 #' @param override Named vector or named list of colours to apply after palette
 #'   generation. These values replace the final colours of the specified
-#'   categories but do not influence the generation of the remaining colours.
+#'   categories.
 #' @param colorspace Passed to [qualpalr::qualpal()].
 #' @param cvd Passed to [qualpalr::qualpal()].
 #' @param bg Passed to [qualpalr::qualpal()].
@@ -176,25 +155,6 @@
 #' @return
 #' A named character vector mapping each resolved level to a colour. If relevant,
 #' the vector may also include an `"NA"` entry.
-#'
-#' @details
-#' The palette is constructed as follows.
-#'
-#' First, the final level set is resolved using `.resolve_levels()`.
-#'
-#' Second, colours in `fixed` are assigned to their corresponding categories.
-#' These colours are also passed to [qualpalr::qualpal()] as fixed reference
-#' colours so that newly generated colours are chosen to maximise perceptual
-#' distance from them.
-#'
-#' Third, colours for the remaining categories are generated automatically.
-#'
-#' Finally, if `override` is supplied, those colours replace the corresponding
-#' entries in the final palette map. This allows users to apply manual
-#' substitutions without affecting the optimisation step used to generate the
-#' other colours.
-#'
-#' The order of the returned palette always follows the resolved level order.
 #'
 #' @keywords internal
 .compute_palette_map <- function(
@@ -279,15 +239,14 @@
 #' [qualpalr::qualpal()]. The function returns a named character vector where
 #' each category is associated with a colour.
 #'
-#' Colours can be generated automatically, fixed for selected categories using
-#' `fixed`, or replaced after generation using `override`.
+#' Colours can be generated automatically, fixed with `fixed`, or replaced with
+#' `override`.
 #'
 #' @param x A vector treated as discrete. It may be a character vector, factor,
 #'   or any vector coercible to character labels.
 #' @param levels Optional character vector specifying the complete set and order
-#'   of categories to include in the palette. If provided, it defines both the
-#'   categories that will appear in the palette and their order. All non-missing
-#'   categories present in `x` must be included.
+#'   of categories to include in the palette. All non-missing categories
+#'   present in `x` must be included.
 #' @param drop Logical; only used when `levels = NULL` and `x` is a factor.
 #'   If `TRUE`, unused factor levels are removed. If `FALSE`, all factor levels
 #'   are retained.
@@ -296,13 +255,10 @@
 #'   `"NA"` entry. Set to `NULL` to ignore missing values.
 #' @param fixed Named vector or named list specifying colours to fix for
 #'   selected categories. Names must correspond to category labels. These
-#'   colours are included during palette generation so that the remaining
-#'   colours are chosen to be perceptually distinct from them by the 
-#'   optimisation algorithm used in qualpalr::qualpal().
+#'   colours are used during palette generation.
 #' @param override Named vector or named list specifying colours to assign
 #'   after palette generation. Names must correspond to category labels.
-#'   These colours replace the final values of the specified categories but do
-#'   not affect how the other colours are generated.
+#'   These colours replace the final values of the specified categories.
 #' @param colorspace Passed to [qualpalr::qualpal()]. Defines the region of
 #'   colour space used to generate colours.
 #' @param cvd Passed to [qualpalr::qualpal()]. Can be used to simulate colour
@@ -316,15 +272,13 @@
 #' A named character vector mapping categories to colours.
 #'
 #' @details
-#' The palette is constructed in three steps.
-#'
-#' First, the set of categories is determined:
+#' Category resolution follows this order:
 #'
 #' - if `levels` is supplied, it defines the complete set and order of categories;
 #' - otherwise, if `x` is a factor, the factor levels are used;
 #' - otherwise, the unique non-missing values of `x` are used.
 #'
-#' Second, colours are assigned:
+#' Colour assignment follows this order:
 #'
 #' - categories specified in `fixed` keep the colours provided by the user;
 #' - colours for the remaining categories are generated automatically using
@@ -334,6 +288,9 @@
 #' entries in the final palette.
 #'
 #' The order of the returned palette always follows the resolved category order.
+#'
+#' If `x` is empty but `levels` is supplied, the palette is generated from
+#' `levels`.
 #'
 #' @seealso
 #' [pal_qualpal()], [qualpalr::qualpal()]
@@ -374,7 +331,7 @@ map_qualpal <- function(
     bg = NULL,
     metric = c("ciede2000", "din99d", "cie76")
 ) {
-  if (length(x) == 0L) {
+  if (length(x) == 0L && is.null(levels)) {
     return(character(0))
   }
   
@@ -484,8 +441,8 @@ ScaleDiscreteQualpal <- ggplot2::ggproto(
 #' Discrete ggplot2 scale based on qualpal
 #'
 #' @description
-#' Internal helper used to construct ggplot2 discrete scales based on
-#' [map_qualpal()] and [pal_qualpal()].
+#' Internal helper for ggplot2 discrete scales based on [map_qualpal()] and
+#' [pal_qualpal()].
 #'
 #' @param aesthetics Character vector of aesthetics to which the scale applies.
 #' @param name The name of the scale. Used as the axis or legend title. If
@@ -493,13 +450,10 @@ ScaleDiscreteQualpal <- ggplot2::ggproto(
 #' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
 #' @param fixed Named vector or named list specifying colours to fix for
 #'   selected categories. Names must correspond to category labels. These
-#'   colours are included during palette generation so that the remaining
-#'   colours are chosen to be perceptually distinct from them by the
-#'   optimisation algorithm used in [qualpalr::qualpal()].
+#'   colours are used during palette generation.
 #' @param override Named vector or named list specifying colours to assign
 #'   after palette generation. Names must correspond to category labels.
-#'   These colours replace the final values of the specified categories but do
-#'   not affect how the other colours are generated.
+#'   These colours replace the final values of the specified categories.
 #' @param colorspace Passed to [qualpalr::qualpal()].
 #' @param cvd Passed to [qualpalr::qualpal()].
 #' @param bg Passed to [qualpalr::qualpal()].
@@ -559,22 +513,18 @@ scale_discrete_qualpal <- function(
 #' Discrete ggplot2 scales that generate qualitative colours using
 #' [qualpalr::qualpal()].
 #'
-#' These scales are wrappers around [ggplot2::discrete_scale()] and support
-#' both fixed colours used during palette generation and final colour
-#' replacements.
+#' These scales support fixed colours used during palette generation and final
+#' colour replacements.
 #'
 #' @param name The name of the scale. Used as the axis or legend title. If
 #'   `waiver()`, the default ggplot2 label is used.
 #' @param ... Additional arguments passed to [ggplot2::discrete_scale()].
 #' @param fixed Named vector or named list specifying colours to fix for
 #'   selected categories. Names must correspond to category labels. These
-#'   colours are included during palette generation so that the remaining
-#'   colours are chosen to be perceptually distinct from them by the
-#'   optimisation algorithm used in [qualpalr::qualpal()].
+#'   colours are used during palette generation.
 #' @param override Named vector or named list specifying colours to assign
 #'   after palette generation. Names must correspond to category labels.
-#'   These colours replace the final values of the specified categories but do
-#'   not affect how the other colours are generated.
+#'   These colours replace the final values of the specified categories.
 #' @param colorspace Passed to [qualpalr::qualpal()].
 #' @param cvd Passed to [qualpalr::qualpal()].
 #' @param bg Passed to [qualpalr::qualpal()].
@@ -701,9 +651,8 @@ scale_fill_qualpal <- function(
 #' @description
 #' Displays a palette as a series of coloured rectangles.
 #'
-#' This function can be used with both unnamed colour vectors, such as those
-#' returned by [pal_qualpal()], and named colour vectors, such as those returned
-#' by [map_qualpal()].
+#' Works with unnamed colour vectors from [pal_qualpal()] and named colour
+#' vectors from [map_qualpal()].
 #'
 #' @param x A character vector of colours.
 #' @param labels Optional labels to display for each colour. If `NULL` and `x`
@@ -715,10 +664,6 @@ scale_fill_qualpal <- function(
 #'
 #' @return
 #' Invisibly returns `x`.
-#'
-#' @details
-#' If `x` is a named vector and `labels = NULL`, the names are used as labels.
-#' This is particularly useful for palettes generated with [map_qualpal()].
 #'
 #' @examples
 #' # Unnamed palette

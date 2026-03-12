@@ -89,6 +89,9 @@ Finally, if \code{override} is supplied, those colours replace the corresponding
 entries in the final palette.
 
 The order of the returned palette always follows the resolved category order.
+
+If \code{x} is empty but \code{levels} is supplied, the palette is generated from
+\code{levels}.
 }
 \examples{
 x <- c("A", "B", "C", "A")
