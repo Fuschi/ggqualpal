@@ -191,10 +191,13 @@
     } else {
       character(0)
     }
+
+    n_generate <- length(seed_colours) + length(lv_free)
+    n_request <- if (length(seed_colours) == 0L && n_generate == 1L) 2L else n_generate
     
     pal_all <- tryCatch(
       qualpalr::qualpal(
-        n = length(seed_colours) + length(lv_free),
+        n = n_request,
         colorspace = colorspace,
         cvd = cvd,
         bg = bg,
@@ -209,7 +212,7 @@
       }
     )
     
-    pal_hex <- pal_all[(length(seed_colours) + 1):length(pal_all)]
+    pal_hex <- pal_all[seq.int(from = length(seed_colours) + 1L, length.out = length(lv_free))]
     names(pal_hex) <- lv_free
     
     palette_map <- c(palette_map, pal_hex)
