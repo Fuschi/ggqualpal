@@ -14,8 +14,8 @@
 \item{arg}{Name of the argument being validated. Used in error messages.}
 }
 \value{
-\code{NULL} if \code{x} is \code{NULL}; otherwise a named character vector containing the
-validated colours, restricted to names present in \code{lv}.
+\code{NULL} if \code{x} is \code{NULL}; otherwise a named vector containing the validated
+colours, restricted to names present in \code{lv}.
 }
 \description{
 Internal helper used to validate named colour vectors such as \code{fixed} and

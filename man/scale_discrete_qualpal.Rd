@@ -8,11 +8,13 @@ scale_discrete_qualpal(
   aesthetics,
   name = ggplot2::waiver(),
   ...,
+  fixed = NULL,
+  override = NULL,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL
+  na.value = NA
 )
 }
 \arguments{
@@ -23,6 +25,17 @@ scale_discrete_qualpal(
 
 \item{...}{Additional arguments passed to \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}.}
 
+\item{fixed}{Named vector or named list specifying colours to fix for
+selected categories. Names must correspond to category labels. These
+colours are included during palette generation so that the remaining
+colours are chosen to be perceptually distinct from them by the
+optimisation algorithm used in \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
+
+\item{override}{Named vector or named list specifying colours to assign
+after palette generation. Names must correspond to category labels.
+These colours replace the final values of the specified categories but do
+not affect how the other colours are generated.}
+
 \item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
 \item{cvd}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
@@ -32,16 +45,16 @@ scale_discrete_qualpal(
 \item{metric}{Distance metric used by \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}. One of
 \code{"ciede2000"}, \code{"din99d"}, or \code{"cie76"}.}
 
-\item{extend}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
+\item{na.value}{Colour used for missing values.}
 }
 \value{
 A ggplot2 discrete scale.
 }
 \description{
 Internal helper used to construct ggplot2 discrete scales based on
-\code{\link[=pal_qualpal]{pal_qualpal()}}.
+\code{\link[=map_qualpal]{map_qualpal()}} and \code{\link[=pal_qualpal]{pal_qualpal()}}.
 }
 \seealso{
-\code{\link[=pal_qualpal]{pal_qualpal()}}, \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
+\code{\link[=map_qualpal]{map_qualpal()}}, \code{\link[=pal_qualpal]{pal_qualpal()}}, \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
 }
 \keyword{internal}

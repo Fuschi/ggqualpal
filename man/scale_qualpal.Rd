@@ -10,31 +10,37 @@
 scale_color_qualpal(
   name = ggplot2::waiver(),
   ...,
+  fixed = NULL,
+  override = NULL,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL
+  na.value = NA
 )
 
 scale_colour_qualpal(
   name = ggplot2::waiver(),
   ...,
+  fixed = NULL,
+  override = NULL,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL
+  na.value = NA
 )
 
 scale_fill_qualpal(
   name = ggplot2::waiver(),
   ...,
+  fixed = NULL,
+  override = NULL,
   colorspace = list(h = c(0, 360), s = c(0.2, 0.5), l = c(0.6, 0.85)),
   cvd = c(protan = 0, deutan = 0, tritan = 0),
   bg = NULL,
   metric = c("ciede2000", "din99d", "cie76"),
-  extend = NULL
+  na.value = NA
 )
 }
 \arguments{
@@ -42,6 +48,17 @@ scale_fill_qualpal(
 \code{waiver()}, the default ggplot2 label is used.}
 
 \item{...}{Additional arguments passed to \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}.}
+
+\item{fixed}{Named vector or named list specifying colours to fix for
+selected categories. Names must correspond to category labels. These
+colours are included during palette generation so that the remaining
+colours are chosen to be perceptually distinct from them by the
+optimisation algorithm used in \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
+
+\item{override}{Named vector or named list specifying colours to assign
+after palette generation. Names must correspond to category labels.
+These colours replace the final values of the specified categories but do
+not affect how the other colours are generated.}
 
 \item{colorspace}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.}
 
@@ -52,7 +69,7 @@ scale_fill_qualpal(
 \item{metric}{Distance metric used by \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}. One of
 \code{"ciede2000"}, \code{"din99d"}, or \code{"cie76"}.}
 
-\item{extend}{Passed to \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}} as an initial fixed palette.}
+\item{na.value}{Colour used for missing values.}
 }
 \value{
 A ggplot2 discrete scale.
@@ -61,8 +78,9 @@ A ggplot2 discrete scale.
 Discrete ggplot2 scales that generate qualitative colours using
 \code{\link[qualpalr:qualpal]{qualpalr::qualpal()}}.
 
-These scales are wrappers around \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}} using
-\code{\link[=pal_qualpal]{pal_qualpal()}} as palette generator.
+These scales are wrappers around \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}} and support
+both fixed colours used during palette generation and final colour
+replacements.
 }
 \examples{
 library(ggplot2)
@@ -81,7 +99,28 @@ ggplot(df, aes(x, y, fill = g)) +
   geom_point(shape = 21, size = 4) +
   scale_fill_qualpal()
 
+df2 <- data.frame(
+  x = 1:5,
+  y = 1:5,
+  g = factor(c("A", "Other", "B", "Smaller", "A"))
+)
+
+ggplot(df2, aes(x, y, fill = g)) +
+  geom_point(shape = 21, size = 5) +
+  scale_fill_qualpal(
+    fixed = c(
+      Other = "transparent",
+      Smaller = "#F5F5DC"
+    )
+  )
+
+ggplot(df2, aes(x, y, colour = g)) +
+  geom_point(size = 4) +
+  scale_color_qualpal(
+    override = c(Other = "#000000")
+  )
+
 }
 \seealso{
-\code{\link[=pal_qualpal]{pal_qualpal()}}, \code{\link[=map_qualpal]{map_qualpal()}}, \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
+\code{\link[=map_qualpal]{map_qualpal()}}, \code{\link[=pal_qualpal]{pal_qualpal()}}, \code{\link[ggplot2:discrete_scale]{ggplot2::discrete_scale()}}
 }
