@@ -10,6 +10,7 @@ Description: Tools to generate perceptually distinct qualitative colour
     palettes to 'ggplot2' graphics.
 License: MIT + file LICENSE
 Encoding: UTF-8
+LazyData: true
 Depends:
     R (>= 4.0)
 Imports: 

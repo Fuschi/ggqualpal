@@ -1,14 +1,18 @@
 # ggqualpal
 
-Generate perceptually distinct qualitative colour palettes and use them easily with **ggplot2**.
+Generate perceptually distinct qualitative palettes for categorical data and
+use them consistently with **ggplot2**.
 
-`ggqualpal` provides simple wrappers around the palette optimisation algorithm implemented in [`qualpalr`](https://github.com/jolars/qualpalr). The package makes it easy to:
+`ggqualpal` wraps the palette optimisation algorithm implemented in
+[`qualpalr`](https://github.com/jolars/qualpalr) and focuses on a simple
+workflow for:
 
-- generate qualitative colour palettes
-- map categories to colours
-- apply qualitative palettes to **ggplot2** scales
+- mapping categories to colours
+- keeping colours stable across plots
+- applying the same mapping in **ggplot2**
 
-The main goal is to simplify the use of `qualpalr` when working with categorical data and visualisation.
+The package is most useful when the same categorical variable appears in
+multiple plots and colour consistency matters.
 
 ---
 
@@ -23,125 +27,102 @@ remotes::install_github("Fuschi/ggqualpal")
 
 ---
 
-# Generate qualitative palettes
+# Example data
 
-Use `pal_qualpal()` to generate perceptually distinct colours.
+`ggqualpal` includes `otu_HMP2`, a genus-level relative abundance table for one
+subject across 51 samples in long format.
 
 ```r
 library(ggqualpal)
+library(ggplot2)
 
-pal <- pal_qualpal()
+data("otu_HMP2", package = "ggqualpal")
 
-pal(6)
-```
-
-Preview the palette:
-
-```r
-show_qualpal(pal(6))
+head(otu_HMP2)
 ```
 
 ---
 
-# Map categories to colours
+# Map genera to colours
 
-`map_qualpal()` maps discrete categories directly to colours.
-
-```r
-x <- c("A", "B", "C", "A")
-
-pal <- map_qualpal(x)
-
-pal
-```
-
-Apply the palette to the data:
+Build one palette for all genera in the dataset and keep `smaller` fixed.
 
 ```r
-pal[x]
-```
-
----
-
-# Fix colours for selected categories
-
-You can reserve specific colours using `fixed`.  
-These colours are taken into account when generating the rest of the palette.
-
-```r
-x <- c("A", "B", "Other", "Smaller")
-
-pal <- map_qualpal(
-  x,
-  fixed = c(
-    Other = "transparent",
-    Smaller = "#F5F5DC"
-  )
+levels_genus <- c(
+  setdiff(unique(otu_HMP2$genus), "smaller"),
+  "smaller"
 )
 
+pal <- map_qualpal(
+  otu_HMP2$genus,
+  levels = levels_genus,
+  fixed = c(smaller = "#E6E6E6")
+)
+
+head(pal)
+```
+
+Preview the mapping:
+
+```r
 show_qualpal(pal)
 ```
 
----
+![Palette used for the HMP2 example](man/figures/README-pal-otu-HMP2.png)
 
-# Replace colours after palette generation
-
-Use `override` to replace colours after the palette has been generated.
+Apply the palette back to the data:
 
 ```r
-map_qualpal(
-  x,
-  override = c(
-    Other = "#000000"
-  )
-)
+pal[otu_HMP2$genus]
 ```
 
 ---
 
 # Use with ggplot2
 
-`ggqualpal` provides discrete ggplot2 scales based on `qualpalr`.
-
 ```r
-library(ggplot2)
-
-df <- data.frame(
-  x = 1:6,
-  y = 1:6,
-  g = factor(c("A", "B", "C", "A", "B", "C"))
-)
-
-ggplot(df, aes(x, y, colour = g)) +
-  geom_point(size = 3) +
-  scale_color_qualpal()
+ggplot(otu_HMP2, aes(sample_id, rela, fill = genus)) +
+  geom_col() +
+  scale_fill_qualpal(
+    limits = names(pal),
+    fixed = c(smaller = "#E6E6E6")
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+    legend.position = "bottom"
+  )
 ```
 
-Fill scale:
+![Genus-level relative abundance across all 51 samples](man/figures/README-otu-HMP2.png)
+
+---
+
+# Generate qualitative palettes
+
+Use `pal_qualpal()` when you only need a vector of distinct colours.
 
 ```r
-ggplot(df, aes(x, y, fill = g)) +
-  geom_point(shape = 21, size = 4) +
-  scale_fill_qualpal()
+pal_fun <- pal_qualpal()
+
+pal_fun(6)
+```
+
+```r
+show_qualpal(pal_fun(6))
 ```
 
 ---
 
 # Why ggqualpal?
 
-`ggqualpal` is designed for situations where many distinct colours are needed,
-such as visualising categorical data with a large number of groups.
+Compared with using `qualpalr` directly, `ggqualpal` provides a more direct
+workflow for:
 
-The package builds on the palette optimisation algorithm implemented in
-`qualpalr`, which generates colours that are maximally distinguishable in
-perceptual colour space.
-
-Compared with using `qualpalr` directly, `ggqualpal` provides:
-
-- simple generation of large qualitative palettes
-- direct mapping from categories to colours
-- seamless integration with ggplot2 scales
-- utilities for inspecting generated palettes
+- stable category-to-colour mapping
+- fixed colours for selected categories
+- direct use in ggplot2 scales
+- quick palette inspection with `show_qualpal()`
 
 ---
 
